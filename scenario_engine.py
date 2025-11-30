@@ -63,6 +63,25 @@ def evaluate_scenarios(
     else:
         sentiment_tag = "NORMAL_SENTIMENT"
 
+    # Liquidation Pulse Logic
+    # High volume + large range + funding shift often implies liquidations.
+    # We'll use a simple heuristic:
+    # 1. Volume > 2x average
+    # 2. Range (High-Low) > 2x ATR
+    # 3. Funding is negative (shorts rekt) or very positive (longs rekt)? 
+    # Actually, usually liqs happen when price moves AGAINST the funding crowd.
+    # For now, let's just flag "High Volatility" events.
+    
+    vol_ma = df['volume'].rolling(24).mean().iloc[-1]
+    curr_vol = last['volume']
+    is_high_vol = curr_vol > 2.0 * vol_ma if not math.isnan(vol_ma) else False
+    is_wide_range = (last['high'] - last['low']) > (2.0 * atr) if not math.isnan(atr) else False
+    
+    liquidation_pulse = "NORMAL"
+    if is_high_vol and is_wide_range:
+        liquidation_pulse = "HIGH_LIQ_RISK"
+        scenario_flags.append("LIQUIDATION_PULSE_DETECTED")
+
     return {
         "price": price,
         "atr_pct": atr_pct,
@@ -71,4 +90,5 @@ def evaluate_scenarios(
         "scenario_flags": scenario_flags,
         "rotation_phase": rotation_phase,
         "sentiment_tag": sentiment_tag,
+        "liquidation_pulse": liquidation_pulse
     }
